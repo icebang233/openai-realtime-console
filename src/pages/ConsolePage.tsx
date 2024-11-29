@@ -8,8 +8,7 @@
  * This will also require you to set OPENAI_API_KEY= in a `.env` file
  * You can run it with `npm run relay`, in parallel with `npm start`
  */
-const LOCAL_RELAY_SERVER_URL: string =
-  process.env.REACT_APP_LOCAL_RELAY_SERVER_URL || '';
+const LOCAL_RELAY_SERVER_URL: string = process.env.REACT_APP_LOCAL_RELAY_SERVER_URL || '';
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 
@@ -59,13 +58,18 @@ export function ConsolePage() {
    * Ask user for API Key
    * If we're using the local relay server, we don't need this
    */
-  const apiKey = LOCAL_RELAY_SERVER_URL
-    ? ''
-    : localStorage.getItem('tmp::voice_api_key') ||
-      prompt('OpenAI API Key') ||
+  const apiKey = localStorage.getItem('tmp::voice_api_key') ||
+      prompt('LLM API KEY') ||
       '';
   if (apiKey !== '') {
     localStorage.setItem('tmp::voice_api_key', apiKey);
+  }
+
+  const llmHost = localStorage.getItem('tmp::host') ||
+      prompt('LLM HOST') ||
+      '';
+  if (llmHost !== '') {
+    localStorage.setItem('tmp::host', llmHost);
   }
 
   /**
@@ -82,14 +86,19 @@ export function ConsolePage() {
   );
   const clientRef = useRef<RealtimeClient>(
     new RealtimeClient(
-      LOCAL_RELAY_SERVER_URL
-        ? { url: LOCAL_RELAY_SERVER_URL }
+      llmHost
+        ? { url: llmHost,
+            apiKey: apiKey,
+            dangerouslyAllowAPIKeyInBrowser: true,
+         }
         : {
             apiKey: apiKey,
             dangerouslyAllowAPIKeyInBrowser: true,
           }
     )
   );
+  // 我也不知道为啥内部没赋值，反正最后强行赋值也可以
+  clientRef.current.realtime.apiKey = apiKey
 
   /**
    * References for
@@ -150,10 +159,17 @@ export function ConsolePage() {
    * When you click the API key
    */
   const resetAPIKey = useCallback(() => {
-    const apiKey = prompt('OpenAI API Key');
+    const apiKey = prompt('LLM API KEY');
     if (apiKey !== null) {
-      localStorage.clear();
       localStorage.setItem('tmp::voice_api_key', apiKey);
+      window.location.reload();
+    }
+  }, []);
+
+  const resetHostKey = useCallback(() => {
+    const llmHost = prompt('LLM HOST');
+    if (llmHost !== null) {
+      localStorage.setItem('tmp::host', llmHost);
       window.location.reload();
     }
   }, []);
@@ -175,11 +191,13 @@ export function ConsolePage() {
 
     // Connect to microphone
     await wavRecorder.begin();
+    
 
     // Connect to audio output
     await wavStreamPlayer.connect();
 
     // Connect to realtime API
+    console.info(client)
     await client.connect();
     client.sendUserMessageContent([
       {
@@ -510,8 +528,19 @@ export function ConsolePage() {
           <img src="/openai-logomark.svg" />
           <span>realtime console</span>
         </div>
+        <div className="content-host-key">
+          { (
+            <Button
+              icon={Edit}
+              iconPosition="end"
+              buttonStyle="flush"
+              label={`host key: ${llmHost}...`}
+              onClick={() => resetHostKey()}
+            />
+          )}
+        </div>
         <div className="content-api-key">
-          {!LOCAL_RELAY_SERVER_URL && (
+          { (
             <Button
               icon={Edit}
               iconPosition="end"
